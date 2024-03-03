@@ -1,65 +1,61 @@
-# Kata link:
-# https://www.codewars.com/kata/53efc28911c36ff01e00012c
+#!/usr/bin/python3
+""" Count it! """
+from requests import get
 
-# -------------------------------------
-# Instructions:
-'''
-The aim of this kata is to determine the number of sub-function calls made by
-an unknown function.
-
-You have to write a function named count_calls which:
-
-    takes as parameter a function and its arguments (args, kwargs)
-
-    calls the function
-
-    returns a tuple containing:
-
-        the number of function calls made inside it and inside all the
-            sub-called functions recursively
-        the function return value.
-NB: The call to the function itself is not counted.
-
-HINT: The sys module may come in handy.
-'''
-
-# -------------------------------------
-# Solution:
-import sys
+REDDIT = "https://www.reddit.com/"
+HEADERS = {'user-agent': 'my-app/0.0.1'}
 
 
-def count_calls(func, *args, **kwargs):
+def count_words(subreddit, word_list, after="", word_dic={}):
     """
-    Count calls in function func
+    Returns a list containing the titles of all hot articles for a
+    given subreddit. If no results are found for the given subreddit,
+    the function should return None.
     """
-    calls = [-1]
-    def tracer(frame, event, arg):
-        if event == 'call':
-            calls[0] += 1
-        return tracer
+    if not word_dic:
+        for word in word_list:
+            word_dic[word] = 0
 
-    sys.settrace(tracer)
+    if after is None:
+        word_list = [[key, value] for key, value in word_dic.items()]
+        word_list = sorted(word_list, key=lambda x: (-x[1], x[0]))
+        for w in word_list:
+            if w[1]:
+                print("{}: {}".format(w[0].lower(), w[1]))
+        return None
 
-    rv = func(*args, **kwargs)
-    return calls[0], rv
+    url = REDDIT + "r/{}/hot/.json".format(subreddit)
 
+    params = {
+        'limit': 100,
+        'after': after
+    }
 
-# -------------------------------------
-# Basic Tests
+    r = get(url, headers=HEADERS, params=params, allow_redirects=False)
 
+    if r.status_code != 200:
+        return None
 
-def add(a, b):
-    return a + b
+    try:
+        js = r.json()
 
+    except ValueError:
+        return None
 
-def add_ten(a):
-    return add(a, 10)
+    try:
 
+        data = js.get("data")
+        after = data.get("after")
+        children = data.get("children")
+        for child in children:
+            post = child.get("data")
+            title = post.get("title")
+            lower = [s.lower() for s in title.split(' ')]
 
-def misc_fun():
-    return add(add_ten(3), add_ten(9))
+            for w in word_list:
+                word_dic[w] += lower.count(w.lower())
 
+    except:
+        return None
 
-print(count_calls(add, 8, 12) == (0, 20))
-print(count_calls(add_ten, 5) == (1, 15))
-print(count_calls(misc_fun) == (5, 32))
+    count_words(subreddit, word_list, after, word_dic)      
